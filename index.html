@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DLR & Adangal Unified Auditor, Converter & GT Notice Generator</title>
+    
+    <!-- Core Data Parsing Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Telugu & Interface Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            color-scheme: light;
+            --ink: #172b3a;
+            --muted: #667887;
+            --line: #dce5e9;
+            --paper: #ffffff;
+            --canvas: #f2f6f5;
+            --navy: #17384a;
+            --teal: #167c78;
+            --teal-dark: #106661;
+            --shadow: 0 12px 32px rgba(23, 56, 74, .07), 0 2px 6px rgba(23, 56, 74, .035);
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0; padding: 24px clamp(14px, 3.2vw, 40px) 24px;
+            color: var(--ink); background: var(--canvas);
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px; line-height: 1.55;
+        }
+        body > h1 {
+            max-width: 1440px; margin: 0 auto 20px !important; padding: 20px 24px;
+            border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
+            color: #fff !important; background: linear-gradient(115deg, #17384a 0%, #205b62 68%, #287a72 100%);
+            box-shadow: 0 12px 28px rgba(23,56,74,.14);
+            font-size: clamp(20px, 2.2vw, 28px); font-weight: 700; letter-spacing: -.03em;
+        }
+        h1, h2, h3, h4 { color: var(--ink); letter-spacing: -.02em; }
+        h2 { margin: 0 0 14px; font-size: 18px; font-weight: 700; }
+        h3 { margin: 0 0 10px; font-size: 15px; font-weight: 700; }
+        p { color: var(--muted); }
+        
+        .card, .converter-card, .notice-section-card, .delta-card {
+            background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+            box-shadow: var(--shadow); padding: 20px; margin-bottom: 22px; max-width: 1440px; margin-left: auto; margin-right: auto;
+        }
+        .converter-card { border-left: 5px solid #6366f1; }
+        .notice-section-card { border-left: 5px solid #b45309; }
+        
+        .grid-container { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; width: 100%; margin: 0 auto 22px; max-width: 1440px; }
+        .grid-col { display: block; width: auto; min-width: 0; }
+        .grid-col > .card { height: 100%; margin-bottom: 0; }
+        
+        label { margin-bottom: 6px; color: #334d5c; font-size: 13px; font-weight: 650; display: block; }
+        input[type="file"] {
+            display: block; width: 100%; padding: 10px 12px;
+            color: #526876; background: #f8fbfa; border: 1px dashed #aebfc5;
+            border-radius: 8px; font: inherit; cursor: pointer;
+        }
+        input[type="file"]:hover { border-color: var(--teal); background: #f1f8f6; }
+        
+        .form-control {
+            width: 100%; padding: 8px 12px; font-size: 13.5px;
+            border: 1px solid var(--line); border-radius: 6px; background: #fff;
+            color: var(--ink); font-family: inherit;
+        }
+        .form-control:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(22,124,120,.15); }
+        
+        .tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0 14px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+        .tab-btn {
+            padding: 9px 13px; border: 1px solid transparent; border-radius: 8px;
+            color: #536977; background: #e6ecee; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 650;
+            transition: all .18s;
+        }
+        .tab-btn:hover { color: var(--teal-dark); background: #d7e4e3; }
+        .tab-btn.active { color: #fff !important; background: var(--navy) !important; border-color: var(--navy); box-shadow: 0 4px 10px rgba(23,56,74,.15); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .table-container { max-height: 480px; overflow: auto; margin: 12px 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; }
+        th { padding: 11px 13px; color: #34505e; background: #edf3f3; border-bottom: 1px solid #d7e2e4; font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+        td { padding: 9px 13px; color: #405765; border-bottom: 1px solid #edf1f2; vertical-align: middle; }
+        tbody tr:nth-child(even) { background: #fbfcfc; }
+        tbody tr:hover { background: #f1f8f6; }
+        .clickable-row { cursor: pointer; }
+        .clickable-row.selected-row { background: #e4f2ef !important; box-shadow: inset 3px 0 0 var(--teal); }
+
+        .btn, .btn-purple, .btn-alt, .btn-amber {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            min-height: 36px; padding: 8px 14px; margin: 0 6px 8px 0;
+            color: #fff; background: var(--teal); border: 1px solid var(--teal);
+            border-radius: 6px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 650;
+            transition: all .18s; text-decoration: none;
+        }
+        .btn:hover { background: var(--teal-dark); }
+        .btn-alt { background: #315f82; border-color: #315f82; }
+        .btn-alt:hover { background: #244b69; }
+        .btn-purple { background: #5363a6; border-color: #5363a6; }
+        .btn-purple:hover { background: #414f8c; }
+        .btn-amber { background: #b45309; border-color: #b45309; }
+        .btn-amber:hover { background: #92400e; }
+        .btn-pdf { background-color: #dc2626; border-color: #dc2626; font-size: 13.5px; padding: 10px 16px; width: 100%; box-shadow: 0 4px 8px rgba(220,38,38,.2); }
+        .btn-pdf:hover { background-color: #b91c1c; }
+        .btn-outline { background: #fff; color: #334d5c; border: 1px solid var(--line); }
+        .btn-outline:hover { background: #f1f6f7; }
+
+        .info-box { padding: 12px 14px; margin: 0 0 15px; color: #526b77; background: #f1f6f7; border: 1px solid #e1eaec; border-left: 3px solid #6d9eaa; border-radius: 6px; font-size: 12.5px; }
+        .delta-card { padding: 16px; border: 1px solid #f0d9d5; border-top: 3px solid #c86b5c; }
+        .delta-extra { border-color: #d8e4ef; border-top-color: #5485ad; }
+        .badge-count { float: right; padding: 2px 8px; color: #435968; background: #edf2f3; border: 1px solid #dfe7e9; border-radius: 12px; font-size: 11px; }
+        .status-pill { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+        .status-pill.success { color: #176b4b; background: #e7f5ed; }
+        .status-pill.info { color: #315f82; background: #eaf2f8; }
+        .match { color: #16805b; font-weight: 700; }
+        .mismatch { color: #b64d43; font-weight: 700; }
+        .loading { color: var(--teal); font-weight: 650; display: none; margin-top: 6px; }
+
+        .profile-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 14px; margin: 15px 0 20px; }
+        .profile-stat-card { padding: 16px; text-align: left; background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--teal) !important; border-radius: 8px; }
+        .profile-stat-card h4 { margin: 0; color: var(--muted); font-size: 11px; font-weight: 750; text-transform: uppercase; }
+        .profile-stat-card .value { margin-top: 5px; color: var(--navy); font-size: 26px; font-weight: 750; }
+
+        /* ================= GT NOTICE GENERATOR SECTION STYLES ================= */
+        .gt-section-grid {
+            display: grid;
+            grid-template-columns: 410px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        .gt-control-box {
+            background: #f8fafc;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .gt-row-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .gt-preview-wrapper {
+            background: #cbd5e1;
+            border-radius: 10px;
+            padding: 18px;
+            overflow-y: auto;
+            max-height: 820px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Strict A4 Paper Dimensions (210mm x 297mm) */
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            min-width: 210mm;
+            min-height: 297mm;
+            max-width: 210mm;
+            max-height: 297mm;
+            background: #ffffff !important;
+            color: #000000 !important;
+            padding: 11mm 14mm;
+            margin-bottom: 24px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            font-family: 'Noto Sans Telugu', system-ui, sans-serif !important;
+        }
+        .notice-card {
+            height: 129mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2mm 0;
+            box-sizing: border-box;
+        }
+        .notice-header {
+            text-align: center;
+            border-bottom: 1.5px solid #000;
+            padding-bottom: 2px;
+            margin-bottom: 5px;
+        }
+        .notice-header h2 { font-size: 15pt; font-weight: 800; margin-bottom: 1px; color: #000; }
+        .notice-header h3 { font-size: 12pt; font-weight: 700; margin-bottom: 1px; color: #000; }
+        .notice-header .tag {
+            display: inline-block; font-size: 9.5pt; font-weight: 700;
+            letter-spacing: 1px; border: 1.2px solid #000;
+            padding: 1px 10px; border-radius: 3px; margin-top: 1px;
+        }
+        .notice-body {
+            font-size: 9.8pt; line-height: 1.45; text-align: justify; color: #000;
+        }
+        .notice-body p { margin-bottom: 5px; text-indent: 1.5rem; }
+        .highlight { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+        .schedule-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 9.5pt; }
+        .schedule-table th, .schedule-table td {
+            border: 1.2px solid #000 !important; padding: 5px 6px; text-align: center; color: #000 !important;
+        }
+        .schedule-table th { background-color: #f8fafc !important; font-weight: 700; }
+        .schedule-table td { font-weight: 600; height: 32px; min-height: 32px; }
+        .return-clause { font-size: 9pt; font-weight: 600; margin: 3px 0 1px 0; color: #000; }
+        .notice-footer {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            font-size: 9.5pt; font-weight: 600; margin-top: 4px; padding-top: 2px; color: #000;
+        }
+        .cut-line { height: 7mm; display: flex; align-items: center; justify-content: center; position: relative; }
+        .cut-line-inner { border-top: 1.5px dashed #475569; width: 100%; position: absolute; }
+        .cut-line-label { background: #fff; padding: 0 12px; position: relative; font-size: 8pt; color: #475569; font-weight: 700; }
+
+        /* Progress Modal */
+        #gt-progress-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.88); display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            z-index: 99999; color: white;
+        }
+        .gt-progress-bar {
+            width: 320px; height: 10px; background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px; overflow: hidden; margin: 15px 0;
+        }
+        .gt-progress-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.1s; }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            border-top: 4px solid #fff; width: 42px; height: 42px;
+            animation: spin 1s linear infinite; margin-bottom: 0.75rem;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @media (max-width: 900px) {
+            .grid-container, .gt-section-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>DLR & Adangal Unified Auditor, Converter & GT Notice Generator</h1>
+    
+    <!-- Section 0: Adangal Original to Processed Converter Tool -->
+    <div class="converter-card">
+        <h3 style="color: #4338ca; margin-bottom: 6px;">🛠️ Raw Adangal Two-Row Format Transformer</h3>
+        <p style="font-size: 13px; color: #475569; margin-top: 0; margin-bottom: 12px;">
+            Upload your portal export (2-row format with alternating parent rows) to consolidate it into single-row format. 
+            You can load it into the audit register below, download Excel/CSV, or push it straight into the <b>GT Notice Generator</b> with one click[cite: 2].
+        </p>
+        <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 280px;">
+                <label>Upload Raw/Original Adangal (XLS / XLSX / CSV):</label>
+                <input type="file" id="rawAdangalTransformerInput" accept=".xls, .xlsx, .csv" />
+            </div>
+            <div id="converterActions" style="display: none; padding-bottom: 2px;">
+                <button class="btn-purple" id="btnPushToRegister">⚡ Load into Adangal Register</button>
+                <button class="btn-amber" id="btnPushToGtNotice">⚡ Load Directly into GT Notice Generator</button>
+                <button class="btn" id="btnDownloadProcessedXlsx" style="background-color: #0284c7;">Download Processed Excel</button>
+                <button class="btn" id="btnDownloadProcessedCsv" style="background-color: #475569;">Download CSV</button>
+            </div>
+        </div>
+        <div id="converterStatus" style="margin-top: 8px; font-size: 13px; font-weight: 500;"></div>
+    </div>
+
+    <!-- Section 0.5: GT Notice Generator (Independent Utility Card) -->
+    <div class="notice-section-card" id="gtNoticeSection">
+        <h3 style="color: #b45309; margin-bottom: 6px;">📜 ఫారం - 15 గ్రౌండ్ ట్రూతింగ్ నోటీసుల జనరేటర్ (GT Notice Generator)</h3>
+        <p style="font-size: 13px; color: #475569; margin-top: 0; margin-bottom: 14px;">
+            ఏపీ సర్వే మరియు సరిహద్దుల చట్టం, 1923 ప్రకారం నోటీసుల తయారీ. పైనున్న అడంగల్ ట్రాన్స్‌ఫార్మర్ నుండి డేటాను పంపవచ్చు లేదా నేరుగా Excel ఫైల్‌‌ను అప్‌లోడ్ చేయవచ్చు[cite: 2]. ప్రతి A4 పేజీకి రెండు సమానమైన నోటీసులు (కట్ లైన్‌తో) ప్రింట్ అగును[cite: 1].
+        </p>
+
+        <div class="gt-section-grid">
+            <!-- Left Controls -->
+            <div class="gt-control-box">
+                <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line);">
+                    <div style="margin-bottom: 8px;">
+                        <label>ఒక్కో PDF లో పేజీల సంఖ్య (Pages per PDF):</label>
+                        <input type="number" id="gtBatchSize" class="form-control" value="100" min="1" max="250">
+                    </div>
+                    <button class="btn btn-pdf" onclick="generateGtBatchA4PDFs()">
+                        📥 100 A4 పేజీల చొప్పున PDF డౌన్‌లోడ్
+                    </button>
+                </div>
+
+                <h3>🏛️ సర్వే నోటిఫికేషన్ వివరాలు</h3>
+                <div style="margin-bottom: 8px;">
+                    <label>ఆర్‌.సి నెం (Rc Number):</label>
+                    <input type="text" id="gtRcNo" class="form-control" placeholder="ఉదా: ఎ 1 /192/2020" oninput="renderGtNotices()">
+                </div>
+
+                <div class="gt-row-2col">
+                    <div>
+                        <label>6(1) నోటిఫికేషన్ తేదీ:</label>
+                        <input type="text" id="gtNotifDate" class="form-control" placeholder="DD-MM-YYYY" oninput="renderGtNotices()">
+                    </div>
+                    <div>
+                        <label>నోటీసు జారీ తేదీ:</label>
+                        <input type="text" id="gtIssueDate" class="form-control" placeholder="DD-MM-YYYY" oninput="renderGtNotices()">
+                    </div>
+                </div>
+
+                <div class="gt-row-2col">
+                    <div>
+                        <label>జిల్లా పేరు (District):</label>
+                        <input type="text" id="gtDistName" class="form-control" placeholder="జిల్లా పేరు" oninput="renderGtNotices()">
+                    </div>
+                    <div>
+                        <label>మండలం పేరు (Mandal):</label>
+                        <input type="text" id="gtMandalName" class="form-control" placeholder="మండలం పేరు" oninput="renderGtNotices()">
+                    </div>
+                </div>
+
+                <div class="gt-row-2col">
+                    <div>
+                        <label>గ్రామము పేరు (Village):</label>
+                        <input type="text" id="gtVillageName" class="form-control" placeholder="గ్రామం పేరు" oninput="renderGtNotices()">
+                    </div>
+                    <div>
+                        <label>సర్వేయర్ హోదా:</label>
+                        <input type="text" id="gtSurveyorTitle" class="form-control" placeholder="గ్రామ సర్వేయర్" oninput="renderGtNotices()">
+                    </div>
+                </div>
+
+                <div class="gt-row-2col">
+                    <div>
+                        <label>సర్వే ప్రారంభ తేదీ:</label>
+                        <input type="text" id="gtSurveyDate" class="form-control" placeholder="DD-MM-YYYY" oninput="renderGtNotices()">
+                    </div>
+                    <div>
+                        <label>ప్రారంభ సమయం:</label>
+                        <input type="text" id="gtSurveyTime" class="form-control" placeholder="ఉదా: ఉదయం 10.00" oninput="renderGtNotices()">
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 14px;">📊 రైతుల డేటా అప్‌లోడ్ (Excel / CSV)</h3>
+                <input type="file" id="gtExcelFileInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 8px;" onchange="handleGtExcelUpload(event)">
+                
+                <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                    <button class="btn btn-outline" style="flex:1;" onclick="downloadGtBlankTemplate()">📄 Blank Template (.xlsx)</button>
+                    <button class="btn btn-outline" style="padding: 2px 10px;" onclick="addGtEmptyRow()">+ కొత్త వరుస</button>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+                    <span class="status-pill info" id="gtRecordCountBadge">మొత్తం రికార్డులు: 0</span>
+                    <button class="btn btn-outline" style="padding: 2px 8px; font-size:11px;" onclick="clearGtData()">క్లియర్ చేయి</button>
+                </div>
+
+                <div class="table-container" style="max-height: 180px; margin-bottom: 0;">
+                    <table style="font-size: 11.5px;">
+                        <thead>
+                            <tr>
+                                <th>సర్వే నెం</th>
+                                <th>ఖాతా</th>
+                                <th>రైతు పేరు</th>
+                                <th>తండ్రి పేరు</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gtDataPreviewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Preview -->
+            <div class="gt-preview-wrapper">
+                <div style="width: 210mm; max-width: 100%; display: flex; justify-content: space-between; margin-bottom: 8px; color: #1e293b; font-weight: 700;">
+                    <span>📄 A4 సైజు ప్రివ్యూ (Live Preview)</span>
+                    <span style="font-size: 12px; font-weight: normal; color: #475569;">210mm × 297mm Portrait</span>
+                </div>
+                <div id="gtPrintArea"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 1 & 2: DLR and Adangal Audit Inputs -->
+    <div class="grid-container">
+        <div class="grid-col">
+            <div class="card">
+                <div class="input-group">
+                    <label>1. Upload Master DLR Report (CSV/Excel):</label>
+                    <input type="file" id="dlrFileInput" accept=".csv, .xlsx, .xls" />
+                    <div id="dlrLoading" class="loading">Parsing DLR dataset...</div>
+                </div>
+            </div>
+        </div>
+        <div class="grid-col">
+            <div class="card">
+                <div class="input-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="margin-bottom: 0;">2. Upload Current Adangal Register (CSV/Excel): <span style="font-weight: normal; font-size:12px; color:#64748b;">(Optional)</span></label>
+                        <span id="adangalLoadedBadge" class="status-pill info" style="display: none;">Loaded</span>
+                    </div>
+                    <input type="file" id="adangalFileInput" accept=".csv, .xlsx, .xls" style="margin-top: 6px;" />
+                    <div id="adangalLoading" class="loading">Parsing Adangal register...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DLR & ADANGAL AUDIT TABS -->
+    <div id="outputArea" style="display: none;">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-combinations', event)">1. Parameter Combos (Cols 9 to 14)</button>
+            <button class="tab-btn" onclick="switchTab('tab-survey', event)">2. Survey Matrix Breakdown</button>
+            <button class="tab-btn" onclick="switchTab('tab-khata', event)">3. Khata Holding Aggregations</button>
+            <button class="tab-btn" onclick="switchTab('tab-delta', event)">4. Survey Khata Delta Audit</button>
+            <button class="tab-btn" onclick="switchTab('tab-joint-lpm', event)">5. Joint LPM Detection</button>
+            <button class="tab-btn" onclick="switchTab('tab-village-profile', event)">6. Village Summary Profile</button>
+        </div>
+
+        <!-- TAB 1 -->
+        <div id="tab-combinations" class="tab-content active card">
+            <h2>Unique Property Parameter Combinations (Columns 9 to 14)</h2>
+            <div class="info-box">💡 Click any header to sort. <b>Hold Ctrl / Cmd + Click</b> to select multiple rows to generate a combined matrix report[cite: 2]. (Cols 7 & 8 excluded)[cite: 2].</div>
+            <div class="table-container">
+                <table id="combinationsTable"><thead><tr></tr></thead><tbody></tbody></table>
+            </div>
+            <div id="drilldownSection" style="display: none; margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 15px;">
+                <h3 id="drilldownTitle">Isolated Records for Selected Combination(s)</h3>
+                <button class="btn" id="downloadCsvBtn">Download Matrix Subset (CSV)</button>
+                <div class="table-container"><table id="drilldownTable"><thead><tr></tr></thead><tbody></tbody></table></div>
+            </div>
+        </div>
+
+        <!-- TAB 2 -->
+        <div id="tab-survey" class="tab-content card">
+            <h2>Survey Number Extent Breakdown Matrix</h2>
+            <div class="info-box">💡 Click on any row to load individual LPM records matching that Survey configuration[cite: 2].</div>
+            <div class="table-container">
+                <table id="surveyTable">
+                    <thead>
+                        <tr>
+                            <th>Base Survey No.</th>
+                            <th>Land Nature (Broad) [Col I]</th>
+                            <th>Land Nature (Sub) [Col J]</th>
+                            <th>Land Classification (Broad) [Col K]</th>
+                            <th>Total LPM Extent (Ac. Cts)</th>
+                            <th>Total Enjoyer Extent (Ac. Cts)</th>
+                            <th>Total Records</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="surveyDrilldownSection" style="display: none; margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 15px;">
+                <h3 id="surveyDrilldownTitle">LPM Records for Selected Survey Block</h3>
+                <button class="btn" id="downloadSurveyCsvBtn">Download Survey Subset (CSV)</button>
+                <div class="table-container"><table id="surveyDrilldownTable"><thead><tr></tr></thead><tbody></tbody></table></div>
+            </div>
+        </div>
+
+        <!-- TAB 3 -->
+        <div id="tab-khata" class="tab-content card">
+            <h2>Khata Number Holding Aggregations</h2>
+            <div class="info-box">💡 Click on any Khata row to isolate its side-by-side DLR vs Adangal individual property records[cite: 2].</div>
+            <div class="table-container">
+                <table id="khataTable">
+                    <thead>
+                        <tr>
+                            <th>Khata Number</th>
+                            <th>DLR Deduplicated Extent (Ac)</th>
+                            <th>Adangal Total Extent (Ac)</th>
+                            <th>Variance (DLR - Adangal)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="khataDrilldownSection" style="display: none; margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 15px;">
+                <h3 id="khataDrilldownTitle">Side-by-Side Breakdown for Selected Khata</h3>
+                <div class="table-container">
+                    <table id="khataDrilldownTable">
+                        <thead>
+                            <tr>
+                                <th style="background-color: #eff6ff;">DLR LPM No</th>
+                                <th style="background-color: #eff6ff;">DLR LPM Extent</th>
+                                <th style="background-color: #eff6ff;">DLR Survey Number</th>
+                                <th style="background-color: #f0fdf4;">Adangal LP / Survey No</th>
+                                <th style="background-color: #f0fdf4;">Adangal Enjoyment Extent</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4 -->
+        <div id="tab-delta" class="tab-content card">
+            <h2>Survey Wise Missing vs. Extra Ported Khata Exceptions</h2>
+            <div class="info-box">📋 <b>Side-by-Side Verification:</b> Click any row below to align DLR registers directly alongside corresponding Adangal holdings[cite: 2].</div>
+            
+            <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+                <button class="btn btn-alt" id="downloadMissingReportBtn">Export All Missing Khatas (CSV)</button>
+                <button class="btn btn-alt" id="downloadExtraReportBtn">Export All Extra Khatas (CSV)</button>
+            </div>
+
+            <div class="grid-container" style="margin-bottom: 0;">
+                <div class="grid-col">
+                    <div class="delta-card">
+                        <h3>⚠️ Missing Khatas (By Survey) <span id="missingBadge" class="badge-count">0</span></h3>
+                        <p style="font-size:12px; color:#64748b;">(Accounts found in Adangal but omitted from DLR)[cite: 2]</p>
+                        <div class="table-container" style="max-height:400px;">
+                            <table id="missingKhataTable">
+                                <thead>
+                                    <tr>
+                                        <th>Survey Number</th>
+                                        <th>Missing Khata No</th>
+                                        <th>Adangal Omitted Extent (Ac)</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid-col">
+                    <div class="delta-card delta-extra">
+                        <h3>➕ Extra Ported Khatas (By Survey) <span id="extraBadge" class="badge-count">0</span></h3>
+                        <p style="font-size:12px; color:#64748b;">(Accounts found in DLR but not in official Adangal)[cite: 2]</p>
+                        <div class="table-container" style="max-height:400px;">
+                            <table id="extraKhataTable">
+                                <thead>
+                                    <tr>
+                                        <th>Survey Number</th>
+                                        <th>Extra DLR Khata No</th>
+                                        <th>DLR Extent (Ac)</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="deltaDrilldownSection" style="display: none; margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 15px;">
+                <h3 id="deltaDrilldownTitle">Side-by-Side Register Comparison</h3>
+                <button class="btn" id="downloadDeltaComparisonBtn">Download Comparison (CSV)</button>
+                <div class="table-container">
+                    <table id="deltaDrilldownTable">
+                        <thead>
+                            <tr>
+                                <th style="background-color: #eff6ff;">DLR LPM No</th>
+                                <th style="background-color: #eff6ff;">DLR LPM Extent</th>
+                                <th style="background-color: #eff6ff;">DLR Survey No</th>
+                                <th style="background-color: #eff6ff; border-right: 3px double #cbd5e1;">DLR Khata No</th>
+                                <th style="background-color: #f0fdf4;">Adangal Survey / LP No</th>
+                                <th style="background-color: #f0fdf4;">Adangal Khata No</th>
+                                <th style="background-color: #f0fdf4;">Adangal Pattadar Extent</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5 -->
+        <div id="tab-joint-lpm" class="tab-content card">
+            <h2>Joint LPM Identification Analysis</h2>
+            <div class="info-box">🔗 <b>Joint LPM:</b> Items where the same LPM Number is mapped across multiple distinct Survey Numbers or Khata Numbers[cite: 2].</div>
+            <div class="table-container">
+                <table id="jointLpmSummaryTable">
+                    <thead>
+                        <tr>
+                            <th>Joint LPM Number</th>
+                            <th>Unique Surveys Linked</th>
+                            <th>Unique Khatas Linked</th>
+                            <th>Nature Count [Col I]</th>
+                            <th>Classifications Count [Col K]</th>
+                            <th>Record Occurrences</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="jointDrilldownSection" style="display: none; margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 15px;">
+                <h3 id="jointDrilldownTitle">Cross-Holding Record Breakdown</h3>
+                <button class="btn" id="downloadJointCsvBtn">Download Joint LPM Set (CSV)</button>
+                <div class="table-container"><table id="jointDrilldownTable"><thead><tr></tr></thead><tbody></tbody></table></div>
+            </div>
+        </div>
+
+        <!-- TAB 6 -->
+        <div id="tab-village-profile" class="tab-content card">
+            <h2>DLR Village Boundary Structural Summary</h2>
+            <div class="info-box">📊 <b>Deduplicated Logic:</b> Metrics treat each unique LPM Number as a single physical entity and footprint[cite: 2].</div>
+            
+            <div class="profile-container">
+                <div class="profile-stat-card">
+                    <h4>Total Unique LPMs</h4>
+                    <div class="value" id="vpTotalLpms">0</div>
+                </div>
+                <div class="profile-stat-card">
+                    <h4>Total Footprint Extent (Acres)</h4>
+                    <div class="value" id="vpTotalExtent">0.000</div>
+                </div>
+            </div>
+
+            <h3>Categorized Structural Layer Summary Report</h3>
+            <div class="table-container">
+                <table id="villageProfileLayersTable">
+                    <thead>
+                        <tr>
+                            <th>Land Nature (Broad) [Col I]</th>
+                            <th>Land Nature (Sub) [Col J]</th>
+                            <th>Land Classification (Broad) [Col K]</th>
+                            <th>Total Deduplicated Extent (Ac)</th>
+                            <th>LPM Count</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Progress Modal -->
+    <div id="gt-progress-overlay">
+        <div class="spinner"></div>
+        <h3 id="gt-progress-title" style="margin-bottom: 0.25rem;">A4 సైజు PDF ఫైల్స్ సిద్ధమవుతున్నాయి...</h3>
+        <div class="gt-progress-bar">
+            <div class="gt-progress-fill" id="gt-progress-fill"></div>
+        </div>
+        <p id="gt-progress-desc" style="font-size: 0.85rem; opacity: 0.9;">దయచేసి వేచి ఉండండి...</p>
+    </div>
+
+    <script>
+        // Global Variables
+        let globalHeaders = [];
+        let globalDataRows = [];
+        let adangalDataRows = [];
+        let isDlrLoaded = false;
+        let isAdangalLoaded = false;
+        let adangalFormatType = "standard";
+
+        // Raw Adangal Transformation Variables
+        let transformedAdangalRows = [];
+        let transformedAdangalHeaders = [
+            'వరుస సంఖ్య', 'సర్వే నెం', 'పూర్తి విస్తీర్ణం',
+            'సాగుకు పనికి రాని విస్తీర్ణం', 'సాగుకు పనికి వచ్చు విస్తీర్ణం',
+            'భూమి స్వభావం', 'శిస్తు (రూ.)', 'భూమి వివరణ', 'జలాధారము',
+            'ఆయకట్టు విస్తీర్ణం', 'ఖాతా నెంబరు/ఆధార్ నెంబరు',
+            'పట్టాదారు పేరు(తండ్రి/భర్త పేరు)', 'అనుభవ దారు పేరు(తండ్రి/భర్త పేరు)',
+            'అనుభవ విస్తీర్ణం', 'అనుభవ స్వభావం'
+        ];
+
+        // GT Notice Recipients State
+        let gtRecipientsData = [];
+
+        // Tab 1 Column Indices
+        const tab1ColIndices = [8, 9, 10, 11, 12, 13];
+        let tab1SortIndex = 0; 
+        let tab1SortAsc = true;
+        let tab1ItemsCache = [];
+        let tab1SelectedKeys = new Set();
+
+        let currentFilteredRows = [];
+        let currentSurveyRows = [];
+        let currentJointRows = [];
+        let sideBySideDeltaExportCache = []; 
+        let globalMissingExportCache = [];
+        let globalExtraExportCache = [];
+
+        let khataDlrGlobalMap = {};
+        let khataAdangalGlobalMap = {};
+        let def_dlr_survey_khata_map = {};
+        let def_adangal_survey_khata_map = {};
+
+        // Event Bindings
+        document.getElementById('dlrFileInput').addEventListener('change', (e) => loadFile(e, 'dlr'));
+        document.getElementById('adangalFileInput').addEventListener('change', (e) => loadFile(e, 'adangal'));
+        document.getElementById('rawAdangalTransformerInput').addEventListener('change', handleRawAdangalFile);
+        
+        document.getElementById('btnPushToRegister').addEventListener('click', applyTransformedToAdangalRegister);
+        document.getElementById('btnPushToGtNotice').addEventListener('click', forwardTransformedToGtNotices);
+        document.getElementById('btnDownloadProcessedXlsx').addEventListener('click', downloadProcessedXlsx);
+        document.getElementById('btnDownloadProcessedCsv').addEventListener('click', downloadProcessedCsv);
+
+        document.getElementById('downloadCsvBtn').addEventListener('click', () => generateDownload(globalHeaders, currentFilteredRows, 'Combined_Matrix_Records.csv'));
+        document.getElementById('downloadSurveyCsvBtn').addEventListener('click', () => generateDownload(globalHeaders, currentSurveyRows, 'Survey_Subset_Records.csv'));
+        document.getElementById('downloadJointCsvBtn').addEventListener('click', () => generateDownload(globalHeaders, currentJointRows, 'Joint_LPM_Cross_Records.csv'));
+        
+        document.getElementById('downloadMissingReportBtn').addEventListener('click', () => {
+            generateDownload(['Survey Number', 'Missing Khata Number', 'Adangal Omitted Extent (Ac)'], globalMissingExportCache, 'All_Missing_Khatas_Report.csv');
+        });
+        document.getElementById('downloadExtraReportBtn').addEventListener('click', () => {
+            generateDownload(['Survey Number', 'Extra DLR Khata Number', 'DLR Extent (Ac)'], globalExtraExportCache, 'All_Extra_Ported_Khatas_Report.csv');
+        });
+        document.getElementById('downloadDeltaComparisonBtn').addEventListener('click', () => {
+            generateDownload([
+                'DLR LPM No', 'DLR LPM Extent', 'DLR Survey No', 'DLR Khata No',
+                'Adangal Survey / LP No', 'Adangal Khata No', 'Adangal Pattadar Extent'
+            ], sideBySideDeltaExportCache, 'Survey_SideBySide_Comparison.csv');
+        });
+
+        // ==========================================
+        //  RAW ADANGAL TRANSFORMATION ENGINE (2-to-1)
+        // ==========================================
+        function handleRawAdangalFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const status = document.getElementById('converterStatus');
+            status.style.color = '#2563eb';
+            status.textContent = 'Analyzing and transforming raw Adangal file...';
+
+            const fileName = file.name.toLowerCase();
+            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+            if (isExcel) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const rawSheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                        executeAdangalTransformation(rawSheetRows, file.name);
+                    } catch(err) {
+                        status.style.color = '#dc2626';
+                        status.textContent = 'Error parsing Excel file: ' + err.message;
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                Papa.parse(file, {
+                    header: false,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        executeAdangalTransformation(results.data, file.name);
+                    }
+                });
+            }
+        }
+
+        function executeAdangalTransformation(sheetRows, originalName) {
+            const status = document.getElementById('converterStatus');
+            if (!sheetRows || sheetRows.length < 2) {
+                status.style.color = '#dc2626';
+                status.textContent = 'File contains insufficient rows to process.';
+                return;
+            }
+
+            let headerIdx = -1;
+            for (let i = 0; i < Math.min(10, sheetRows.length); i++) {
+                let row = sheetRows[i];
+                if (row && row.length > 0 && row.some(cell => cell && (cell.toString().includes('వరుస సంఖ్య') || cell.toString().includes('సర్వే నెం')))) {
+                    headerIdx = i;
+                    break;
+                }
+            }
+
+            let dataLines = (headerIdx !== -1) ? sheetRows.slice(headerIdx + 1) : sheetRows;
+            transformedAdangalRows = [];
+            let lastSurveyNumber = "";
+            let currentRecordIndex = 1;
+
+            for (let i = 0; i < dataLines.length; i += 2) {
+                let rowPrimary = dataLines[i] ? [...dataLines[i]] : [];
+                let rowSecondary = (i + 1 < dataLines.length && dataLines[i+1]) ? [...dataLines[i+1]] : [];
+                if (rowPrimary.length === 0 && rowSecondary.length === 0) continue;
+
+                rowPrimary[0] = currentRecordIndex++;
+
+                let curSurvey = (rowPrimary[1] !== undefined && rowPrimary[1] !== null) ? rowPrimary[1].toString().trim() : '';
+                if (curSurvey && curSurvey !== "None") {
+                    lastSurveyNumber = curSurvey;
+                } else {
+                    rowPrimary[1] = lastSurveyNumber;
+                }
+
+                if (rowPrimary[10] !== undefined && rowPrimary[10] !== null && rowPrimary[10].toString().trim() !== '') {
+                    let kParsed = parseFloat(rowPrimary[10].toString().replace(/[^0-9.]/g, ''));
+                    if (!isNaN(kParsed)) {
+                        rowPrimary[10] = Math.floor(kParsed).toString();
+                    }
+                }
+
+                let fatherSpouseName = (rowSecondary[11] !== undefined && rowSecondary[11] !== null) ? rowSecondary[11].toString().trim() : '';
+                if (fatherSpouseName) {
+                    rowPrimary[12] = fatherSpouseName;
+                }
+
+                transformedAdangalRows.push(rowPrimary);
+            }
+
+            status.style.color = '#16a34a';
+            status.innerHTML = `✅ Successfully transformed <b>${transformedAdangalRows.length}</b> records from <i>${originalName}</i>.`;
+            document.getElementById('converterActions').style.display = 'inline-block';
+        }
+
+        function applyTransformedToAdangalRegister() {
+            if (transformedAdangalRows.length === 0) return;
+            adangalDataRows = transformedAdangalRows;
+            adangalFormatType = "alternate";
+            isAdangalLoaded = true;
+            
+            const badge = document.getElementById('adangalLoadedBadge');
+            badge.style.display = 'inline-block';
+            badge.className = 'status-pill success';
+            badge.textContent = `Active (${transformedAdangalRows.length} records)`;
+
+            executeMasterUnifiedAudit();
+            alert(`Transformed dataset (${transformedAdangalRows.length} records) loaded into Adangal Register.`);
+        }
+
+        /* Forward processed Adangal records into the GT Notice Generator */
+        function forwardTransformedToGtNotices() {
+            if (transformedAdangalRows.length === 0) {
+                alert("Please process a Raw Adangal file first.");
+                return;
+            }
+
+            gtRecipientsData = transformedAdangalRows.map(row => {
+                let surveyNo = row[1] !== undefined ? row[1].toString().trim() : '';
+                let khataNo = row[10] !== undefined ? row[10].toString().trim() : '';
+                let rawPattadar = row[11] !== undefined ? row[11].toString().trim() : '';
+                let relativeName = row[12] !== undefined ? row[12].toString().trim() : '';
+                let ownerName = rawPattadar.split('(')[0].trim() || rawPattadar;
+
+                return {
+                    surveyNo: surveyNo,
+                    khataNo: khataNo,
+                    ownerName: ownerName,
+                    relativeName: relativeName,
+                    mobileNo: ""
+                };
+            });
+
+            renderGtDataPreviewTable();
+            renderGtNotices();
+
+            // Smooth scroll directly to the GT Notice Generator section
+            document.getElementById('gtNoticeSection').scrollIntoView({ behavior: 'smooth' });
+            alert(`విజయవంతం! ${gtRecipientsData.length} అడంగల్ రికార్డులు GT Notice Generator లోకి లోడ్ చేయబడ్డాయి.`);
+        }
+
+        function downloadProcessedXlsx() {
+            if (transformedAdangalRows.length === 0) return;
+            const wb = XLSX.utils.book_new();
+            const wsData = [transformedAdangalHeaders, ...transformedAdangalRows];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            XLSX.utils.book_append_sheet(wb, ws, "PahaniResult (13)");
+            XLSX.writeFile(wb, "PROCESSED_ADANGAL.xlsx");
+        }
+
+        function downloadProcessedCsv() {
+            if (transformedAdangalRows.length === 0) return;
+            generateDownload(transformedAdangalHeaders, transformedAdangalRows, "PROCESSED_ADANGAL.csv");
+        }
+
+        // ==========================================
+        //  FILE LOADING & AUDITOR PIPELINE
+        // ==========================================
+        function loadFile(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+            document.getElementById(type + 'Loading').style.display = 'block';
+
+            const fileName = file.name.toLowerCase();
+            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+            if (isExcel) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                    parseMatrixRows(sheetRows, type);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                Papa.parse(file, {
+                    header: false,
+                    skipEmptyLines: true,
+                    complete: function(results) { parseMatrixRows(results.data, type); }
+                });
+            }
+        }
+
+        function parseMatrixRows(rawRows, type) {
+            if (type === 'dlr') {
+                let headerIdx = -1;
+                for (let i = 0; i < rawRows.length; i++) {
+                    if (rawRows[i] && rawRows[i][0] && rawRows[i][0].toString().trim() === "Sl.No") {
+                        headerIdx = i;
+                        break;
+                    }
+                }
+                if (headerIdx === -1) {
+                    alert("Could not identify 'Sl.No' header inside the DLR file.");
+                    document.getElementById('dlrLoading').style.display = 'none';
+                    return;
+                }
+                globalHeaders = rawRows[headerIdx];
+                let dataStart = headerIdx + 1;
+                if (rawRows[dataStart] && rawRows[dataStart][0] && rawRows[dataStart][1] &&
+                    rawRows[dataStart][0].toString().trim() === "1" && rawRows[dataStart][1].toString().trim() === "2") {
+                    dataStart++;
+                }
+                globalDataRows = rawRows.slice(dataStart).filter(r => r && r.length >= 21);
+                isDlrLoaded = true;
+                document.getElementById('dlrLoading').style.display = 'none';
+                executeMasterUnifiedAudit();
+            } else {
+                let isTwoRowFormat = false;
+                let dataStart = -1;
+                adangalFormatType = "standard";
+
+                for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+                    let r = rawRows[i];
+                    if (r && r[0] && (r[0].toString().trim() === "1" || r[0].toString().trim() === "1.0") && r[1] && r[1].toString().trim() === "2") {
+                        dataStart = i + 1;
+                        adangalFormatType = "standard";
+                        break;
+                    }
+                    if (r && r[0] && r[0].toString().trim() === "వరుస సంఖ్య") {
+                        dataStart = i + 1;
+                        adangalFormatType = "alternate";
+                        if (rawRows.length > i + 2 && (!rawRows[i+2][0] || rawRows[i+2][0].toString().trim() === '')) {
+                            isTwoRowFormat = true;
+                        }
+                        break;
+                    }
+                }
+
+                if (dataStart === -1) {
+                    for (let i = 0; i < rawRows.length; i++) {
+                        if (rawRows[i] && rawRows[i][0] && rawRows[i][0].toString().includes("క్రమ")) {
+                            dataStart = i + 2;
+                            break;
+                        }
+                    }
+                }
+
+                let effectiveRows = rawRows.slice(dataStart !== -1 ? dataStart : 0);
+
+                if (isTwoRowFormat) {
+                    let normalized = [];
+                    let lastSurvey = "";
+                    let recIdx = 1;
+                    for (let i = 0; i < effectiveRows.length; i += 2) {
+                        let p = effectiveRows[i] ? [...effectiveRows[i]] : [];
+                        let s = (i + 1 < effectiveRows.length && effectiveRows[i+1]) ? [...effectiveRows[i+1]] : [];
+                        if (!p.length) continue;
+                        p[0] = recIdx++;
+                        let sNum = (p[1] !== undefined && p[1] !== null) ? p[1].toString().trim() : '';
+                        if (sNum && sNum !== "None") lastSurvey = sNum;
+                        else p[1] = lastSurvey;
+                        if (s[11]) p[12] = s[11].toString().trim();
+                        if (p[10]) {
+                            let k = parseFloat(p[10].toString().replace(/[^0-9.]/g, ''));
+                            if (!isNaN(k)) p[10] = Math.floor(k).toString();
+                        }
+                        normalized.push(p);
+                    }
+                    adangalDataRows = normalized;
+                } else {
+                    adangalDataRows = effectiveRows.filter(r => r && r.length >= 11);
+                }
+
+                isAdangalLoaded = true;
+                const badge = document.getElementById('adangalLoadedBadge');
+                badge.style.display = 'inline-block';
+                badge.className = 'status-pill success';
+                badge.textContent = `Loaded (${adangalDataRows.length} records)`;
+
+                document.getElementById('adangalLoading').style.display = 'none';
+                executeMasterUnifiedAudit();
+            }
+        }
+
+        function parseFloatSafe(val) {
+            if (val === null || val === undefined) return 0;
+            let parsed = parseFloat(val.toString().replace(/[^0-9.]/g, ''));
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        function extractBaseSurvey(surveyStr) {
+            if (!surveyStr) return "Unknown";
+            return surveyStr.toString().split(/[\/-]/)[0].replace(/[']/g, '').trim() || "Unknown";
+        }
+
+        function switchTab(tabId, event) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+        }
+
+        function executeMasterUnifiedAudit() {
+            if (!isDlrLoaded || globalDataRows.length === 0) return;
+
+            const comboMap = {};
+            const surveyGroupMap = {};
+            const jointLpmMap = {};
+            const globalUniqueLpmExtents = {};
+            const profileLayerMap = {};
+
+            khataDlrGlobalMap = {};
+            khataAdangalGlobalMap = {};
+            def_dlr_survey_khata_map = {};
+            def_adangal_survey_khata_map = {};
+            tab1SelectedKeys.clear();
+
+            globalDataRows.forEach(row => {
+                let lpmNo = (row[1] !== undefined && row[1] !== null) ? row[1].toString().trim() : 'Unknown';
+                let lpmExtent = parseFloatSafe(row[2]);
+                let rawSurveyStr = (row[3] !== undefined && row[3] !== null) ? row[3].toString().trim() : '';
+                let baseSurvey = extractBaseSurvey(rawSurveyStr);
+                let khataNo = (row[14] !== undefined && row[14] !== null) ? row[14].toString().trim() : '';
+                let enjoyerExtent = parseFloatSafe(row[20]);
+
+                let landNatureBroad = (row[8] !== undefined && row[8] !== null) ? row[8].toString().trim() : '';
+                let landNatureSub = (row[9] !== undefined && row[9] !== null) ? row[9].toString().trim() : '';
+                let landClassBroad = (row[10] !== undefined && row[10] !== null) ? row[10].toString().trim() : '';
+
+                if (lpmNo && lpmNo !== 'Unknown') {
+                    globalUniqueLpmExtents[lpmNo] = lpmExtent;
+                    let vLayerKey = `${landNatureBroad}||${landNatureSub}||${landClassBroad}`;
+                    if (!profileLayerMap[vLayerKey]) {
+                        profileLayerMap[vLayerKey] = { broadNature: landNatureBroad, subNature: landNatureSub, broadClass: landClassBroad, seenLpms: {}, totalExtent: 0, count: 0 };
+                    }
+                    if (!profileLayerMap[vLayerKey].seenLpms[lpmNo]) {
+                        profileLayerMap[vLayerKey].seenLpms[lpmNo] = true;
+                        profileLayerMap[vLayerKey].totalExtent += lpmExtent;
+                        profileLayerMap[vLayerKey].count++;
+                    }
+                }
+
+                let comboCols = tab1ColIndices.map(c => (row[c] !== undefined && row[c] !== null) ? row[c].toString().trim() : '');
+                let comboString = JSON.stringify(comboCols);
+                if (!comboMap[comboString]) {
+                    comboMap[comboString] = { cols: comboCols, count: 0, rawKey: comboString, seenLPMs: {}, lpmTotal: 0 };
+                }
+                comboMap[comboString].count++;
+                if (!comboMap[comboString].seenLPMs[lpmNo]) {
+                    comboMap[comboString].seenLPMs[lpmNo] = true;
+                    comboMap[comboString].lpmTotal += lpmExtent;
+                }
+
+                if (rawSurveyStr) {
+                    let groupKey = `${baseSurvey}||${landNatureBroad}`;
+                    if (!surveyGroupMap[groupKey]) {
+                        surveyGroupMap[groupKey] = { baseSurvey, broadNature: landNatureBroad, subNature: landNatureSub, broadClass: landClassBroad, lpmTotal: 0, enjoyerTotal: 0, count: 0, seenLPMs: {} };
+                    }
+                    surveyGroupMap[groupKey].enjoyerTotal += enjoyerExtent;
+                    surveyGroupMap[groupKey].count++;
+                    if (!surveyGroupMap[groupKey].seenLPMs[lpmNo]) {
+                        surveyGroupMap[groupKey].seenLPMs[lpmNo] = true;
+                        surveyGroupMap[groupKey].lpmTotal += lpmExtent;
+                    }
+
+                    if (khataNo) {
+                        if (!def_dlr_survey_khata_map[baseSurvey]) def_dlr_survey_khata_map[baseSurvey] = {};
+                        def_dlr_survey_khata_map[baseSurvey][khataNo] = (def_dlr_survey_khata_map[baseSurvey][khataNo] || 0) + lpmExtent;
+                    }
+                }
+
+                if (khataNo) {
+                    if (!khataDlrGlobalMap[khataNo]) khataDlrGlobalMap[khataNo] = { totalExtent: 0, seenLPMs: {}, rawRecords: [] };
+                    khataDlrGlobalMap[khataNo].rawRecords.push({ lpmNo, lpmExtent, surveyNo: rawSurveyStr });
+                    if (!khataDlrGlobalMap[khataNo].seenLPMs[lpmNo]) {
+                        khataDlrGlobalMap[khataNo].seenLPMs[lpmNo] = true;
+                        khataDlrGlobalMap[khataNo].totalExtent += lpmExtent;
+                    }
+                }
+
+                if (lpmNo && lpmNo !== 'Unknown') {
+                    if (!jointLpmMap[lpmNo]) {
+                        jointLpmMap[lpmNo] = { uniqueSurveys: new Set(), uniqueKhatas: new Set(), uniqueNatures: new Set(), uniqueClassifications: new Set(), totalRows: 0 };
+                    }
+                    if (baseSurvey) jointLpmMap[lpmNo].uniqueSurveys.add(baseSurvey);
+                    if (khataNo) jointLpmMap[lpmNo].uniqueKhatas.add(khataNo);
+                    if (landNatureBroad) jointLpmMap[lpmNo].uniqueNatures.add(landNatureBroad);
+                    if (landClassBroad) jointLpmMap[lpmNo].uniqueClassifications.add(landClassBroad);
+                    jointLpmMap[lpmNo].totalRows++;
+                }
+            });
+
+            if (isAdangalLoaded) {
+                adangalDataRows.forEach(row => {
+                    let kNo = "";
+                    let extent = 0;
+                    let lpNo = "";
+
+                    if (adangalFormatType === "standard") {
+                        kNo = (row[12] !== undefined && row[12] !== null) ? row[12].toString().trim() : '';
+                        extent = parseFloatSafe(row[14]);
+                        lpNo = (row[1] || '').toString().replace(/[']/g, '').trim();
+                    } else {
+                        kNo = (row[10] !== undefined && row[10] !== null) ? row[10].toString().trim() : '';
+                        extent = parseFloatSafe(row[13]);
+                        lpNo = (row[1] || '').toString().replace(/[']/g, '').trim();
+                    }
+
+                    if (kNo && !kNo.includes("(") && !isNaN(parseFloat(kNo))) {
+                        kNo = parseFloat(kNo).toString();
+                        let baseSurvey = extractBaseSurvey(lpNo);
+
+                        if (!khataAdangalGlobalMap[kNo]) khataAdangalGlobalMap[kNo] = { totalExtent: 0, rawRecords: [] };
+                        khataAdangalGlobalMap[kNo].totalExtent += extent;
+                        khataAdangalGlobalMap[kNo].rawRecords.push({ lpNo, extent });
+
+                        if (baseSurvey && baseSurvey !== "Unknown") {
+                            if (!def_adangal_survey_khata_map[baseSurvey]) def_adangal_survey_khata_map[baseSurvey] = {};
+                            def_adangal_survey_khata_map[baseSurvey][kNo] = (def_adangal_survey_khata_map[baseSurvey][kNo] || 0) + extent;
+                        }
+                    }
+                });
+            }
+
+            tab1ItemsCache = Object.values(comboMap);
+            renderCombinationsTable();
+
+            const surveyBody = document.querySelector('#surveyTable tbody');
+            surveyBody.innerHTML = '';
+            Object.values(surveyGroupMap).sort((a,b) => a.baseSurvey.localeCompare(b.baseSurvey, undefined, {numeric: true})).forEach(item => {
+                let tr = document.createElement('tr');
+                tr.className = 'clickable-row';
+                tr.onclick = function() { showSurveyDrilldown(item.baseSurvey, item.broadNature, tr); };
+                tr.innerHTML = `
+                    <td><b>${item.baseSurvey}</b></td>
+                    <td>${item.broadNature || '-'}</td>
+                    <td>${item.subNature || '-'}</td>
+                    <td>${item.broadClass || '-'}</td>
+                    <td><b>${item.lpmTotal.toFixed(3)}</b></td>
+                    <td>${item.enjoyerTotal.toFixed(3)}</td>
+                    <td>${item.count}</td>
+                `;
+                surveyBody.appendChild(tr);
+            });
+
+            const khataBody = document.querySelector('#khataTable tbody');
+            khataBody.innerHTML = '';
+            const allKhatas = new Set([...Object.keys(khataDlrGlobalMap), ...Object.keys(khataAdangalGlobalMap)]);
+            Array.from(allKhatas).sort((a, b) => a.localeCompare(b, undefined, {numeric: true})).forEach(khata => {
+                let dlrExt = khataDlrGlobalMap[khata] ? khataDlrGlobalMap[khata].totalExtent : 0;
+                let adangalExt = khataAdangalGlobalMap[khata] ? khataAdangalGlobalMap[khata].totalExtent : 0;
+                let variance = dlrExt - adangalExt;
+                let statusHtml = Math.abs(variance) < 0.001 ? '<span class="match">Match</span>' : '<span class="mismatch">Discrepancy</span>';
+
+                let tr = document.createElement('tr');
+                tr.className = 'clickable-row';
+                tr.onclick = function() { showKhataDrilldown(khata, khataAdangalGlobalMap[khata] ? khataAdangalGlobalMap[khata].rawRecords : [], tr); };
+                tr.innerHTML = `
+                    <td><b>${khata}</b></td>
+                    <td>${dlrExt.toFixed(3)}</td>
+                    <td>${adangalExt.toFixed(3)}</td>
+                    <td style="color: ${Math.abs(variance) > 0.001 ? '#b91c1c' : '#1e293b'}">${variance.toFixed(3)}</td>
+                    <td>${statusHtml}</td>
+                `;
+                khataBody.appendChild(tr);
+            });
+
+            const missingBody = document.querySelector('#missingKhataTable tbody');
+            const extraBody = document.querySelector('#extraKhataTable tbody');
+            missingBody.innerHTML = '';
+            extraBody.innerHTML = '';
+            let missingCount = 0;
+            let extraCount = 0;
+            globalMissingExportCache = [];
+            globalExtraExportCache = [];
+
+            if (isAdangalLoaded) {
+                const allSurveys = new Set([...Object.keys(def_dlr_survey_khata_map), ...Object.keys(def_adangal_survey_khata_map)]);
+                Array.from(allSurveys).sort((a, b) => a.localeCompare(b, undefined, {numeric: true})).forEach(survey => {
+                    let adgKhatas = def_adangal_survey_khata_map[survey] || {};
+                    let dlrKhatas = def_dlr_survey_khata_map[survey] || {};
+
+                    Object.keys(adgKhatas).forEach(khata => {
+                        if (!dlrKhatas[khata]) {
+                            let tr = document.createElement('tr');
+                            tr.className = 'clickable-row';
+                            tr.onclick = function() { showDeltaSideBySideDrilldown(survey, tr); };
+                            tr.innerHTML = `<td><b>${survey}</b></td><td>${khata}</td><td>${adgKhatas[khata].toFixed(3)}</td>`;
+                            missingBody.appendChild(tr);
+                            globalMissingExportCache.push([survey, khata, adgKhatas[khata].toFixed(3)]);
+                            missingCount++;
+                        }
+                    });
+
+                    Object.keys(dlrKhatas).forEach(khata => {
+                        if (!adgKhatas[khata]) {
+                            let tr = document.createElement('tr');
+                            tr.className = 'clickable-row';
+                            tr.onclick = function() { showDeltaSideBySideDrilldown(survey, tr); };
+                            tr.innerHTML = `<td><b>${survey}</b></td><td>${khata}</td><td>${dlrKhatas[khata].toFixed(3)}</td>`;
+                            extraBody.appendChild(tr);
+                            globalExtraExportCache.push([survey, khata, dlrKhatas[khata].toFixed(3)]);
+                            extraCount++;
+                        }
+                    });
+                });
+            }
+            document.getElementById('missingBadge').textContent = missingCount;
+            document.getElementById('extraBadge').textContent = extraCount;
+            if (missingBody.innerHTML === '') missingBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#64748b; padding:15px;">No unmapped survey exceptions found.</td></tr>`;
+            if (extraBody.innerHTML === '') extraBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#64748b; padding:15px;">No extra ported survey exceptions found.</td></tr>`;
+
+            const jointBody = document.querySelector('#jointLpmSummaryTable tbody');
+            jointBody.innerHTML = '';
+            Object.keys(jointLpmMap).sort((a,b) => a.localeCompare(b, undefined, {numeric: true})).forEach(lpm => {
+                let info = jointLpmMap[lpm];
+                if (info.uniqueSurveys.size > 1 || info.uniqueKhatas.size > 1) {
+                    let tr = document.createElement('tr');
+                    tr.className = 'clickable-row';
+                    tr.onclick = function() { showJointDrilldown(lpm, tr); };
+                    let natureList = Array.from(info.uniqueNatures).filter(n => n !== '').join(', ') || '-';
+                    let classList = Array.from(info.uniqueClassifications).filter(c => c !== '').join(', ') || '-';
+
+                    tr.innerHTML = `
+                        <td><b>${lpm}</b></td>
+                        <td><span style="color: #2563eb; font-weight: bold;">${info.uniqueSurveys.size}</span> (${Array.from(info.uniqueSurveys).join(', ')})</td>
+                        <td><span style="color: #10b981; font-weight: bold;">${info.uniqueKhatas.size}</span></td>
+                        <td><span style="color: #3b82f6; font-weight: bold;">${info.uniqueNatures.size}</span> (${natureList})</td>
+                        <td><span style="color: #b45309; font-weight: bold;">${info.uniqueClassifications.size}</span> (${classList})</td>
+                        <td>${info.totalRows}</td>
+                    `;
+                    jointBody.appendChild(tr);
+                }
+            });
+            if(jointBody.innerHTML === '') {
+                jointBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: #64748b; padding: 20px;">No Joint LPM instances identified in this file.</td></tr>`;
+            }
+
+            let totalUniqueLpmsCount = Object.keys(globalUniqueLpmExtents).length;
+            let totalVillageExtentSum = Object.values(globalUniqueLpmExtents).reduce((a, b) => a + b, 0);
+            document.getElementById('vpTotalLpms').textContent = totalUniqueLpmsCount;
+            document.getElementById('vpTotalExtent').textContent = totalVillageExtentSum.toFixed(3);
+
+            const profileLayerBody = document.querySelector('#villageProfileLayersTable tbody');
+            profileLayerBody.innerHTML = '';
+            Object.values(profileLayerMap).sort((a,b) => a.broadNature.localeCompare(b.broadNature)).forEach(layer => {
+                profileLayerBody.innerHTML += `<tr>
+                    <td><b>${layer.broadNature || '-'}</b></td>
+                    <td>${layer.subNature || '-'}</td>
+                    <td>${layer.broadClass || '-'}</td>
+                    <td><b>${layer.totalExtent.toFixed(3)}</b></td>
+                    <td>${layer.count}</td>
+                </tr>`;
+            });
+
+            document.getElementById('outputArea').style.display = 'block';
+        }
+
+        function renderCombinationsTable() {
+            const comboTable = document.getElementById('combinationsTable');
+            if (!comboTable) return;
+            const comboHeaderRow = comboTable.querySelector('thead tr');
+            comboHeaderRow.innerHTML = '';
+            
+            tab1ColIndices.forEach((c, colIdx) => {
+                let th = document.createElement('th');
+                let sortingIndicator = tab1SortIndex === colIdx ? (tab1SortAsc ? " ▴" : " ▾") : "";
+                th.textContent = (globalHeaders[c] || `Column ${c + 1}`) + sortingIndicator;
+                th.style.cursor = 'pointer';
+                th.onclick = () => handleTab1Sort(colIdx);
+                comboHeaderRow.appendChild(th);
+            });
+            
+            let thExtent = document.createElement('th');
+            thExtent.textContent = "Deduplicated LPM Extent" + (tab1SortIndex === tab1ColIndices.length ? (tab1SortAsc ? " ▴" : " ▾") : "");
+            thExtent.style.cursor = 'pointer';
+            thExtent.onclick = () => handleTab1Sort(tab1ColIndices.length);
+            comboHeaderRow.appendChild(thExtent);
+            
+            let thRows = document.createElement('th');
+            thRows.textContent = "Total Rows" + (tab1SortIndex === tab1ColIndices.length + 1 ? (tab1SortAsc ? " ▴" : " ▾") : "");
+            thRows.style.cursor = 'pointer';
+            thRows.onclick = () => handleTab1Sort(tab1ColIndices.length + 1);
+            comboHeaderRow.appendChild(thRows);
+
+            tab1ItemsCache.sort((a, b) => {
+                if (tab1SortIndex < tab1ColIndices.length) {
+                    let valA = a.cols[tab1SortIndex] || '';
+                    let valB = b.cols[tab1SortIndex] || '';
+                    return tab1SortAsc ? valA.localeCompare(valB, undefined, {numeric: true}) : valB.localeCompare(valA, undefined, {numeric: true});
+                } else if (tab1SortIndex === tab1ColIndices.length) {
+                    return tab1SortAsc ? a.lpmTotal - b.lpmTotal : b.lpmTotal - a.lpmTotal;
+                } else {
+                    return tab1SortAsc ? a.count - b.count : b.count - a.count;
+                }
+            });
+
+            const comboBody = comboTable.querySelector('tbody');
+            comboBody.innerHTML = '';
+            tab1ItemsCache.forEach(item => {
+                let tr = document.createElement('tr');
+                tr.className = 'clickable-row';
+                if (tab1SelectedKeys.has(item.rawKey)) tr.classList.add('selected-row');
+                tr.onclick = function(event) { handleComboRowClick(item.rawKey, event); };
+                item.cols.forEach(val => { tr.innerHTML += `<td>${val}</td>`; });
+                tr.innerHTML += `<td><b>${item.lpmTotal.toFixed(3)}</b></td><td>${item.count}</td>`;
+                comboBody.appendChild(tr);
+            });
+        }
+
+        function handleTab1Sort(index) {
+            if (tab1SortIndex === index) tab1SortAsc = !tab1SortAsc;
+            else { tab1SortIndex = index; tab1SortAsc = true; }
+            renderCombinationsTable();
+        }
+
+        function handleComboRowClick(jsonKey, event) {
+            const isMultiSelect = event.ctrlKey || event.metaKey;
+            if (!isMultiSelect) {
+                tab1SelectedKeys.clear();
+                tab1SelectedKeys.add(jsonKey);
+            } else {
+                if (tab1SelectedKeys.has(jsonKey)) tab1SelectedKeys.delete(jsonKey);
+                else tab1SelectedKeys.add(jsonKey);
+            }
+
+            const rows = document.querySelectorAll('#combinationsTable tbody tr');
+            tab1ItemsCache.forEach((item, idx) => {
+                if (tab1SelectedKeys.has(item.rawKey)) rows[idx].classList.add('selected-row');
+                else rows[idx].classList.remove('selected-row');
+            });
+            executeMultiComboIsolationSummary();
+        }
+
+        function executeMultiComboIsolationSummary() {
+            if (tab1SelectedKeys.size === 0) {
+                document.getElementById('drilldownSection').style.display = 'none';
+                currentFilteredRows = [];
+                return;
+            }
+            currentFilteredRows = globalDataRows.filter(row => {
+                let checkCols = tab1ColIndices.map(c => (row[c] !== undefined && row[c] !== null) ? row[c].toString().trim() : '');
+                return tab1SelectedKeys.has(JSON.stringify(checkCols));
+            });
+            document.getElementById('drilldownTitle').textContent = `Isolated Combined Records: Selected (${tab1SelectedKeys.size}) Layer Combinations — [Total Items: ${currentFilteredRows.length}]`;
+            renderTargetTable('#drilldownTable', currentFilteredRows);
+            document.getElementById('drilldownSection').style.display = 'block';
+        }
+
+        function showDeltaSideBySideDrilldown(baseSurvey, element) {
+            document.querySelectorAll('#missingKhataTable .clickable-row, #extraKhataTable .clickable-row').forEach(r => r.classList.remove('selected-row'));
+            element.classList.add('selected-row');
+
+            const tbody = document.querySelector('#deltaDrilldownTable tbody');
+            tbody.innerHTML = '';
+            sideBySideDeltaExportCache = [];
+
+            let dlrMatchedRows = globalDataRows.filter(row => {
+                let sStr = row[3];
+                return sStr && extractBaseSurvey(sStr) === baseSurvey;
+            }).map(row => ({
+                lpmNo: row[1] !== undefined ? row[1].toString().trim() : '',
+                lpmExtent: parseFloatSafe(row[2]).toFixed(3),
+                surveyNo: row[3] !== undefined ? row[3].toString().trim() : '',
+                khataNo: row[14] !== undefined ? row[14].toString().trim() : ''
+            }));
+
+            let adangalMatchedRows = [];
+            if (isAdangalLoaded) {
+                adangalDataRows.forEach(row => {
+                    let lpNo = (row[1] || '').toString().replace(/[']/g, '').trim();
+                    if (extractBaseSurvey(lpNo) === baseSurvey) {
+                        let kNo = adangalFormatType === "standard" ? (row[12] || '').toString().trim() : (row[10] || '').toString().trim();
+                        let extent = parseFloatSafe(adangalFormatType === "standard" ? row[14] : row[13]);
+                        if (kNo && !kNo.includes("(") && !isNaN(parseFloat(kNo))) kNo = parseFloat(kNo).toString();
+                        adangalMatchedRows.push({ surveyNo: lpNo, khataNo: kNo, extent: extent.toFixed(3) });
+                    }
+                });
+            }
+
+            document.getElementById('deltaDrilldownTitle').innerHTML = `Side-by-Side Comparison for Survey: ${baseSurvey}`;
+            let maxLen = Math.max(dlrMatchedRows.length, adangalMatchedRows.length);
+            for (let i = 0; i < maxLen; i++) {
+                let d = dlrMatchedRows[i] || { lpmNo: '', lpmExtent: '', surveyNo: '', khataNo: '' };
+                let a = adangalMatchedRows[i] || { surveyNo: '', khataNo: '', extent: '' };
+
+                tbody.innerHTML += `<tr>
+                    <td style="background-color: #fafbfe;"><b>${d.lpmNo}</b></td>
+                    <td style="background-color: #fafbfe;">${d.lpmExtent || ''}</td>
+                    <td style="background-color: #fafbfe; color:#475569;"><small>${d.surveyNo}</small></td>
+                    <td style="background-color: #fafbfe; border-right: 3px double #cbd5e1;">${d.khataNo}</td>
+                    <td style="background-color: #fbfdfb; color:#475569;"><small>${a.surveyNo}</small></td>
+                    <td style="background-color: #fbfdfb;">${a.khataNo}</td>
+                    <td style="background-color: #fbfdfb; font-weight:bold; color:#0f766e;">${a.extent || ''}</td>
+                </tr>`;
+
+                sideBySideDeltaExportCache.push([d.lpmNo, d.lpmExtent, d.surveyNo, d.khataNo, a.surveyNo, a.khataNo, a.extent]);
+            }
+            document.getElementById('deltaDrilldownSection').style.display = 'block';
+            document.getElementById('deltaDrilldownSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showSurveyDrilldown(baseSurvey, broadNature, element) {
+            document.querySelectorAll('#surveyTable .clickable-row').forEach(r => r.classList.remove('selected-row'));
+            element.classList.add('selected-row');
+            currentSurveyRows = globalDataRows.filter(row => {
+                let sStr = row[3];
+                let rNat = (row[8] !== undefined && row[8] !== null) ? row[8].toString().trim() : '';
+                return sStr && extractBaseSurvey(sStr) === baseSurvey && rNat === broadNature;
+            });
+            document.getElementById('surveyDrilldownTitle').textContent = `Individual LPM Records: Survey Block ${baseSurvey} (${broadNature}) — [${currentSurveyRows.length} items]`;
+            renderTargetTable('#surveyDrilldownTable', currentSurveyRows);
+            document.getElementById('surveyDrilldownSection').style.display = 'block';
+            document.getElementById('surveyDrilldownSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showKhataDrilldown(khataNum, adangalRecords, element) {
+            document.querySelectorAll('#khataTable .clickable-row').forEach(r => r.classList.remove('selected-row'));
+            element.classList.add('selected-row');
+            document.getElementById('khataDrilldownTitle').textContent = `Asset Map for Khata Holder: Account ${khataNum}`;
+            const tbody = document.querySelector('#khataDrilldownTable tbody');
+            tbody.innerHTML = '';
+
+            let dlrRecords = khataDlrGlobalMap[khataNum] ? khataDlrGlobalMap[khataNum].rawRecords : [];
+            let maxLen = Math.max(dlrRecords.length, adangalRecords.length);
+
+            for (let i = 0; i < maxLen; i++) {
+                let dlr = dlrRecords[i] || { lpmNo: '', lpmExtent: '', surveyNo: '' };
+                let adg = adangalRecords[i] || { lpNo: '', extent: '' };
+
+                tbody.innerHTML += `<tr>
+                    <td style="background-color: #fafbfe;">${dlr.lpmNo}</td>
+                    <td style="background-color: #fafbfe;">${dlr.lpmExtent ? parseFloat(dlr.lpmExtent).toFixed(3) : ''}</td>
+                    <td style="background-color: #fafbfe; color:#475569;"><small>${dlr.surveyNo}</small></td>
+                    <td style="background-color: #fbfdfb;">${adg.lpNo}</td>
+                    <td style="background-color: #fbfdfb;">${adg.extent ? parseFloat(adg.extent).toFixed(3) : ''}</td>
+                </tr>`;
+            }
+            document.getElementById('khataDrilldownSection').style.display = 'block';
+            document.getElementById('khataDrilldownSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showJointDrilldown(lpmNo, element) {
+            document.querySelectorAll('#jointLpmSummaryTable .clickable-row').forEach(r => r.classList.remove('selected-row'));
+            element.classList.add('selected-row');
+            currentJointRows = globalDataRows.filter(row => {
+                let checkLpm = (row[1] !== undefined && row[1] !== null) ? row[1].toString().trim() : '';
+                return checkLpm === lpmNo;
+            });
+            document.getElementById('jointDrilldownTitle').textContent = `Cross Holding Record Map for Joint LPM Number: ${lpmNo} (${currentJointRows.length} rows tied)`;
+            renderTargetTable('#jointDrilldownTable', currentJointRows);
+            document.getElementById('jointDrilldownSection').style.display = 'block';
+            document.getElementById('jointDrilldownSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderTargetTable(tableId, targetRows) {
+            const trHead = document.querySelector(`${tableId} thead tr`);
+            trHead.innerHTML = '';
+            globalHeaders.forEach(h => { trHead.innerHTML += `<th>${h || ''}</th>`; });
+            const tbody = document.querySelector(`${tableId} tbody`);
+            tbody.innerHTML = '';
+            targetRows.forEach(row => {
+                let trHtml = '<tr>';
+                globalHeaders.forEach((_, idx) => { trHtml += `<td>${row[idx] !== undefined ? row[idx] : ''}</td>`; });
+                trHtml += '</tr>';
+                tbody.innerHTML += trHtml;
+            });
+        }
+
+        function generateDownload(headers, targetRows, fileName) {
+            if (!targetRows || targetRows.length === 0) return;
+            const csvContent = Papa.unparse([headers, ...targetRows]);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.setAttribute("href", URL.createObjectURL(blob));
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ==========================================
+        //  GT NOTICE GENERATOR (FORM-15) ENGINE
+        // ==========================================
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function renderGtDataPreviewTable() {
+            const tbody = document.getElementById('gtDataPreviewBody');
+            tbody.innerHTML = '';
+            const displayRows = gtRecipientsData.slice(0, 30);
+            displayRows.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" value="${escapeHtml(row.surveyNo || '')}" style="width:100%; border:none;" onchange="updateGtCell(${idx}, 'surveyNo', this.value)"></td>
+                    <td><input type="text" value="${escapeHtml(row.khataNo || '')}" style="width:100%; border:none;" onchange="updateGtCell(${idx}, 'khataNo', this.value)"></td>
+                    <td><input type="text" value="${escapeHtml(row.ownerName || '')}" style="width:100%; border:none;" onchange="updateGtCell(${idx}, 'ownerName', this.value)"></td>
+                    <td><input type="text" value="${escapeHtml(row.relativeName || '')}" style="width:100%; border:none;" onchange="updateGtCell(${idx}, 'relativeName', this.value)"></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('gtRecordCountBadge').innerText = `మొత్తం రికార్డులు: ${gtRecipientsData.length}`;
+        }
+
+        function updateGtCell(index, key, value) {
+            if (gtRecipientsData[index]) {
+                gtRecipientsData[index][key] = value;
+                renderGtNotices();
+            }
+        }
+
+        function addGtEmptyRow() {
+            gtRecipientsData.push({ surveyNo: "", khataNo: "", ownerName: "", relativeName: "", mobileNo: "" });
+            renderGtDataPreviewTable();
+            renderGtNotices();
+        }
+
+        function clearGtData() {
+            if (confirm("అన్ని రికార్డులను క్లియర్ చేయాలా?")) {
+                gtRecipientsData = [];
+                renderGtDataPreviewTable();
+                renderGtNotices();
+            }
+        }
+
+        function buildGtNoticeCardHtml(data) {
+            const rcNo = escapeHtml(document.getElementById('gtRcNo').value.trim()) || "_________________";
+            const notifDate = escapeHtml(document.getElementById('gtNotifDate').value.trim()) || "__________";
+            const issueDate = escapeHtml(document.getElementById('gtIssueDate').value.trim()) || "__________";
+            const distName = escapeHtml(document.getElementById('gtDistName').value.trim()) || "____________";
+            const mandalName = escapeHtml(document.getElementById('gtMandalName').value.trim()) || "____________";
+            const villageName = escapeHtml(document.getElementById('gtVillageName').value.trim()) || "____________";
+            const surveyDate = escapeHtml(document.getElementById('gtSurveyDate').value.trim()) || "__________";
+            const surveyTime = escapeHtml(document.getElementById('gtSurveyTime').value.trim()) || "__________";
+            const surveyorTitle = escapeHtml(document.getElementById('gtSurveyorTitle').value.trim()) || "గ్రామ సర్వేయర్";
+
+            const sNo = escapeHtml(data.surveyNo || '') || '&nbsp;';
+            const khata = escapeHtml(data.khataNo || '') || '&nbsp;';
+            const name = escapeHtml(data.ownerName || '') || '&nbsp;';
+            const relName = escapeHtml(data.relativeName || '') || '&nbsp;';
+            const mobile = escapeHtml(data.mobileNo || '') || '&nbsp;';
+
+            return `
+                <div class="notice-card">
+                    <div>
+                        <div class="notice-header">
+                            <h2>ఫారం - 15</h2>
+                            <h3>భూ యాజమాన్య దారులకు నోటీసు</h3>
+                            <div class="tag">FOR GROUND TRUTHING</div>
+                        </div>
+
+                        <div class="notice-body">
+                            <p>
+                                1) సర్వే సహాయక సంచాలకులు వారి 6(1) నోటిఫికేషన్ ఆర్‌.సి నెం <span class="highlight">${rcNo}</span> తేది: <span class="highlight">${notifDate}</span>, అనుసరించి, 
+                                <span class="highlight">${distName}</span> జిల్లా, <span class="highlight">${mandalName}</span> మండలం, 
+                                <span class="highlight">${villageName}</span> గ్రామములో సీమానిర్ణయం (demarcation) మరియు సర్వే పనులు 
+                                <span class="highlight">${surveyDate}</span> తేదీన <span class="highlight">${surveyTime}</span> గం.ని.లకు ప్రారంభిచబడును అని తెలియజేయడమైనది.
+                            </p>
+                            <p>
+                                2) సర్వే మరియు సరిహద్దుల చట్టం, 1923లోని నియమ నిబంధనలు అనుసరించి సర్వే సమయం నందు ఈ క్రింది షెడ్యూల్ లోని భూ యజమానులు భూమి వద్ద హాజరై మీ పొలము యొక్క సరిహద్దులను చూపించి, తగిన సమాచారం మరియు అవసరమైన సహాయ సహకారములు అందించవలసినదిగా తెలియజేయడమైనది.
+                            </p>
+                        </div>
+
+                        <table class="schedule-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 14%;">సర్వే నెం</th>
+                                    <th style="width: 14%;">ఖాతా సంఖ్య</th>
+                                    <th style="width: 25%;">భూ యజమాని పేరు</th>
+                                    <th style="width: 25%;">భర్త / తండ్రి పేరు</th>
+                                    <th style="width: 12%;">మొబైల్ నెం</th>
+                                    <th style="width: 10%;">సంతకం</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>${sNo}</td>
+                                    <td>${khata}</td>
+                                    <td>${name}</td>
+                                    <td>${relName}</td>
+                                    <td>${mobile}</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="return-clause">
+                            3) నోటీసు యొక్క ప్రతిని సంతకం చేసి తిరిగి పంపించవలెను.
+                        </div>
+                    </div>
+
+                    <div class="notice-footer">
+                        <div>
+                            స్థలం: <span class="highlight">${villageName}</span><br>
+                            తేది: <span class="highlight">${issueDate}</span>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="height: 24px;"></div>
+                            <div><strong>${surveyorTitle}</strong></div>
+                            <div>${villageName} గ్రామ సచివాలయం</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createGtPageElement(person) {
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'a4-page';
+            const noticeHtml = buildGtNoticeCardHtml(person);
+            pageDiv.innerHTML = `
+                ${noticeHtml}
+                <div class="cut-line">
+                    <div class="cut-line-inner"></div>
+                    <span class="cut-line-label">✂ ✂ ✂</span>
+                </div>
+                ${noticeHtml}
+            `;
+            return pageDiv;
+        }
+
+        function renderGtNotices() {
+            const container = document.getElementById('gtPrintArea');
+            container.innerHTML = '';
+
+            if (gtRecipientsData.length === 0) {
+                container.innerHTML = `
+                    <div style="background: white; padding: 40px; text-align: center; border-radius: 8px; width: 100%; border: 1px dashed var(--line);">
+                        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📋</div>
+                        <h3 style="color: #334155; margin-bottom: 0.25rem;">ఎలాంటి రికార్డులు లోడ్ కాలేదు</h3>
+                        <p style="color: #64748b; font-size: 0.85rem;">ఎడమ వైపు వివరాలను నమోదు చేయండి లేదా అడంగల్ సెక్షన్ నుండి రికార్డులను పుష్ చేయండి.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const previewLimit = Math.min(gtRecipientsData.length, 2);
+            for (let i = 0; i < previewLimit; i++) {
+                container.appendChild(createGtPageElement(gtRecipientsData[i]));
+            }
+
+            if (gtRecipientsData.length > 2) {
+                const moreNote = document.createElement('div');
+                moreNote.style.cssText = 'padding: 12px; color: #475569; font-weight: 600; text-align: center; width: 100%;';
+                moreNote.innerText = `... ఇంకా ${gtRecipientsData.length - 2} రికార్డులు ఉన్నాయి (PDF లో ప్రతి రైతుకు 1 పూర్తి A4 పేజీ వస్తుంది)`;
+                container.appendChild(moreNote);
+            }
+        }
+
+        function handleGtExcelUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+                    if (!rawRows || rawRows.length === 0) {
+                        alert("ఎంచుకున్న Excel ఫైల్‌లో ఎలాంటి రికార్డులు కనిపించలేదు.");
+                        return;
+                    }
+
+                    gtRecipientsData = rawRows.map(row => {
+                        const findVal = (regex) => {
+                            for (const key of Object.keys(row)) {
+                                if (regex.test(key.trim())) return String(row[key]).trim();
+                            }
+                            return "";
+                        };
+
+                        return {
+                            surveyNo: findVal(/సర్వే|survey|sy\.?no|sno/i),
+                            khataNo: findVal(/ఖాతా|khata|khatha|acc/i),
+                            ownerName: findVal(/యజమాని|రైతు|owner|pattadar|name|పేరు/i),
+                            relativeName: findVal(/తండ్రి|భర్త|father|husband|relation/i),
+                            mobileNo: findVal(/మొబైల్|ఫోన్|mobile|phone|cell/i)
+                        };
+                    });
+
+                    renderGtDataPreviewTable();
+                    renderGtNotices();
+                    alert(`సక్సెస్! ${gtRecipientsData.length} రికార్డులు లోడ్ చేయబడ్డాయి.`);
+                } catch (error) {
+                    console.error(error);
+                    alert("Excel ఫైల్ ప్రాసెస్ చేయడంలో లోపం తలెత్తింది.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        function downloadGtBlankTemplate() {
+            const templateData = [
+                { "సర్వే నెం": "", "ఖాతా సంఖ్య": "", "భూ యజమాని పేరు": "", "భర్త/తండ్రి పేరు": "", "మొబైల్ నెంబరు": "" }
+            ];
+            const ws = XLSX.utils.json_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Notices");
+            XLSX.writeFile(wb, "Form15_GT_Notice_Template.xlsx");
+        }
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        /* Batch A4 PDF Generator (100 pages per file) */
+        async function generateGtBatchA4PDFs() {
+            if (!gtRecipientsData || gtRecipientsData.length === 0) {
+                alert("డౌన్‌లోడ్ చేయడానికి ఎలాంటి నోటీసులు లేవు. దయచేసి డేటాను జోడించండి.");
+                return;
+            }
+
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+
+            const rawBatchSize = parseInt(document.getElementById('gtBatchSize').value, 10);
+            const batchSize = (!isNaN(rawBatchSize) && rawBatchSize > 0) ? rawBatchSize : 100;
+
+            const overlay = document.getElementById('gt-progress-overlay');
+            const progressTitle = document.getElementById('gt-progress-title');
+            const progressDesc = document.getElementById('gt-progress-desc');
+            const progressFill = document.getElementById('gt-progress-fill');
+            overlay.style.display = 'flex';
+
+            const village = document.getElementById('gtVillageName').value.trim() || 'Village';
+            const totalRecords = gtRecipientsData.length;
+            const totalBatches = Math.ceil(totalRecords / batchSize);
+            const { jsPDF } = window.jspdf;
+
+            // In-viewport, low opacity staging container for high-fidelity rasterization
+            const stage = document.createElement('div');
+            stage.style.cssText = 'position: fixed; top: 0; left: 0; z-index: 10000; background: #ffffff; pointer-events: none; opacity: 0.01;';
+            document.body.appendChild(stage);
+
+            try {
+                for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+                    const startIdx = batchIdx * batchSize;
+                    const endIdx = Math.min(startIdx + batchSize, totalRecords);
+                    const currentBatchData = gtRecipientsData.slice(startIdx, endIdx);
+                    const batchCount = currentBatchData.length;
+
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4',
+                        compress: true
+                    });
+
+                    for (let i = 0; i < batchCount; i++) {
+                        const currentPerson = currentBatchData[i];
+                        const currentOverallNum = startIdx + i + 1;
+
+                        const percent = Math.round(((i + 1) / batchCount) * 100);
+                        progressFill.style.width = `${percent}%`;
+                        progressTitle.innerText = `PDF ఫైల్ ${batchIdx + 1} / ${totalBatches} సిద్ధమవుతోంది...`;
+                        progressDesc.innerText = `పేజీ ${i + 1} of ${batchCount} (రికార్డు #${currentOverallNum})`;
+
+                        stage.innerHTML = '';
+                        const pageEl = createGtPageElement(currentPerson);
+                        stage.appendChild(pageEl);
+
+                        await sleep(25);
+
+                        const canvas = await html2canvas(pageEl, {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false,
+                            backgroundColor: '#ffffff'
+                        });
+
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+                        if (i > 0) {
+                            pdf.addPage('a4', 'portrait');
+                        }
+
+                        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+                    }
+
+                    stage.innerHTML = '';
+                    const partNumber = String(batchIdx + 1).padStart(3, '0');
+                    const fileName = `Form15_GT_Notice_${village}_Part_${partNumber}_(Pages_${batchCount}).pdf`;
+                    pdf.save(fileName);
+
+                    if (batchIdx < totalBatches - 1) {
+                        await sleep(800);
+                    }
+                }
+
+                alert(`విజయవంతంగా పూర్తయింది! మొత్తం ${totalBatches} PDF ఫైల్స్ డౌన్‌లోడ్ అయ్యాయి.`);
+            } catch (err) {
+                console.error("Batch PDF generation error:", err);
+                alert("PDF తయారీలో సాంకేతిక లోపం వచ్చింది: " + err.message);
+            } finally {
+                if (stage.parentNode) {
+                    document.body.removeChild(stage);
+                }
+                overlay.style.display = 'none';
+            }
+        }
+
+        // Initialize GT Preview
+        renderGtDataPreviewTable();
+        renderGtNotices();
+    </script>
+</body>
+</html>
