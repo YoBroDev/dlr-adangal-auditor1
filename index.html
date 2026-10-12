@@ -747,6 +747,29 @@
             }
         }
 
+
+        // Remove Aadhaar numbers from the combined Khata/Aadhaar cell.
+        // Keep every non-Aadhaar Khata value exactly as supplied, including
+        // government Khata numbers that are commonly 5 or 6 digits long.
+        function cleanKhataCell(value) {
+            if (value === null || value === undefined) return '';
+            let text = String(value).trim();
+            if (!text) return '';
+
+            // Aadhaar is a 12-digit numeric token. Remove it, not 5/6-digit
+            // government Khata numbers or other shorter Khata identifiers.
+            text = text.replace(/(?<!\d)\d{12}(?!\d)/g, '');
+
+            // Clean separators left behind when Aadhaar was in the same cell.
+            text = text
+                .replace(/[;,|/]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .replace(/^[\s:.-]+|[\s:.-]+$/g, '')
+                .trim();
+
+            return text;
+        }
+
         function executeAdangalTransformation(sheetRows, originalName) {
             const status = document.getElementById('converterStatus');
             if (!sheetRows || sheetRows.length < 2) {
@@ -783,12 +806,7 @@
                     rowPrimary[1] = lastSurveyNumber;
                 }
 
-                if (rowPrimary[10] !== undefined && rowPrimary[10] !== null && rowPrimary[10].toString().trim() !== '') {
-                    let kParsed = parseFloat(rowPrimary[10].toString().replace(/[^0-9.]/g, ''));
-                    if (!isNaN(kParsed)) {
-                        rowPrimary[10] = Math.floor(kParsed).toString();
-                    }
-                }
+                rowPrimary[10] = cleanKhataCell(rowPrimary[10]);
 
                 let fatherSpouseName = (rowSecondary[11] !== undefined && rowSecondary[11] !== null) ? rowSecondary[11].toString().trim() : '';
                 if (fatherSpouseName) {
@@ -962,10 +980,7 @@
                         if (sNum && sNum !== "None") lastSurvey = sNum;
                         else p[1] = lastSurvey;
                         if (s[11]) p[12] = s[11].toString().trim();
-                        if (p[10]) {
-                            let k = parseFloat(p[10].toString().replace(/[^0-9.]/g, ''));
-                            if (!isNaN(k)) p[10] = Math.floor(k).toString();
-                        }
+                        p[10] = cleanKhataCell(p[10]);
                         normalized.push(p);
                     }
                     adangalDataRows = normalized;
